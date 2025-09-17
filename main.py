@@ -1,45 +1,37 @@
 import streamlit as st
-from openai import OpenAI
-import os
-from dotenv import load_dotenv
+from transformers import pipeline
+import torch
 
-load_dotenv()
+# Page configuration
+st.set_page_config(
+    page_title="🤖 Free AI Chatbot",
+    page_icon="🤖",
+    layout="wide"
+)
 
-# Initialize OpenAI client - NEW SYNTAX
-api_key = os.getenv("OPENAI_API_KEY")
-st.sidebar.write(f"API Key loaded: {bool(api_key)}")
-st.sidebar.write(f"Key starts with: {api_key[:7] if api_key else 'None'}")
+st.title("🤖 Free AI Chatbot")
+st.write("💡 No API keys or external tools needed!")
 
-if not api_key:
-    st.error("❌ API key not found! Check your .env file")
-else:
-    client = OpenAI(api_key=api_key)
-
-st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
-
-# Custom CSS
-st.markdown("""
-<style>
-    .stChatInput { position: fixed; bottom: 20px; width: 80%; }
-</style>
-""", unsafe_allow_html=True)
-
-# Sidebar
-with st.sidebar:
-    st.title("⚙️ Settings")
-    model = st.selectbox("Choose model:", ["gpt-3.5-turbo", "gpt-4"])
-    temperature = st.slider("Temperature:", 0.0, 1.0, 0.7)
-
-st.title("🤖 AI Chatbot")
+# Load a small local model
+@st.cache_resource
+def load_model():
+    try:
+        return pipeline(
+            "text-generation",
+            model="gpt2",
+            device=-1,  # Use CPU
+            max_length=100,
+            torch_dtype=torch.float32
+        )
+    except:
+        return None
 
 # Initialize chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": "You are a helpful AI assistant."}
-    ]
+    st.session_state.messages = []
 
 # Display chat messages
-for message in st.session_state.messages[1:]:
+for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -53,18 +45,25 @@ if prompt := st.chat_input("Type your message here..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                # NEW OpenAI v1.0.0+ syntax
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=st.session_state.messages,
-                    max_tokens=500,
-                    temperature=temperature
-                )
-                
-                bot_response = response.choices[0].message.content
-                st.markdown(bot_response)
-                st.session_state.messages.append({"role": "assistant", "content": bot_response})
-                
+                model = load_model()
+                if model:
+                    response = model(prompt, max_length=100)[0]['generated_text']
+                    # Clean up response
+                    response = response.replace(prompt, "").strip()
+                    st.markdown(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                else:
+                    st.info("💡 First time setup: Downloading AI model... This may take a minute.")
             except Exception as e:
                 st.error(f"Error: {e}")
 
+# Instructions
+with st.sidebar:
+    st.title("ℹ️ Instructions")
+    st.write("""
+    This chatbot uses GPT-2 running locally on your device.
+    
+    **First run might take a minute** to download the model.
+    
+    No internet required after initial download!
+    """)
