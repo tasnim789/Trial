@@ -6,7 +6,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize OpenAI client - NEW SYNTAX
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+api_key = os.getenv("OPENAI_API_KEY")
+st.sidebar.write(f"API Key loaded: {bool(api_key)}")
+st.sidebar.write(f"Key starts with: {api_key[:7] if api_key else 'None'}")
+
+if not api_key:
+    st.error("❌ API key not found! Check your .env file")
+else:
+    client = OpenAI(api_key=api_key)
 
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 
@@ -60,3 +67,4 @@ if prompt := st.chat_input("Type your message here..."):
                 
             except Exception as e:
                 st.error(f"Error: {e}")
+
